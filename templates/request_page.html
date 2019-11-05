@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <meta charset="utf-8">
+        <style>
+            #btnConnect,#btnStart,#btnStop {
+                background-color: #4CAF50; /* Green */
+                border: none;
+                color: white;
+                padding: 10px 25px;
+                text-align: center;
+                text-decoration: none;
+                display: inline-block;
+                font-size: 1px;
+                margin: 4px 2px;
+                cursor: pointer;
+                border-radius: 4px;
+            }
+            #URL, #Interval{
+                background-color:transparent;
+                border:1px solid #4CAF50;
+                margin-right: 10px;
+                border-radius: 4px;
+                height:1.5em;
+            }
+            #txtContent{
+                background-color:transparent;
+                border:1px solid #4CAF50;
+            }
+            input[disabled]{
+                background:#4CAF50;
+                opacity:0.6;
+                color:white;
+            }
+
+        </style>
+    </head>
+    <body>
+    <h3>URL Request</h3>
+    <div id="login">
+        <div style="margin-bottom: 15px">
+            <label for="URL" style="margin-right: 3px">URL</label>
+            <input id="URL" type="text" placeholder="Please enter url" value="" />
+            <label for="Interval" style="margin-right: 3px">Time Interval (ms)</label>
+            <input id="Interval" type="text" placeholder="Please enter time interval" value="" />
+        </div>
+        <div style="margin-bottom: 15px">
+            <input id="btnConnect" type="button" value="Connect" onclick="connect_and_send()"/>
+            <input id="btnStart" type="button" value="Start" onclick="start()" disabled=true/>
+            <input id="btnStop" type="button" value="Stop" onclick="stop()" disabled=true/>
+        </div>
+        <div>
+            <div style="margin-bottom: 2px">
+                Detail for Requests
+            </div>
+            <textarea id="txtContent" cols="70" rows="15" readonly="readonly">Request Time            Times</textarea>
+        </div>
+    </div>
+    </body>
+    <script>
+        function sleep(ms) {
+            return new Promise(resolve => setTimeout(resolve, ms));
+        }
+
+        var socket;
+        var current=0;
+        var total;
+        var beforetime;
+
+        function connect_and_send() {
+            var host = "ws://" + "127.0.0.1" + ":" + "9999" + "/";
+            document.getElementById("btnConnect").value = "Connecting...";
+            document.getElementById("btnConnect").disabled = true;
+            socket = new WebSocket(host);
+            try {
+                socket.onopen = function (msg) {
+                    document.getElementById("btnConnect").value = "Connect successfully";
+                    document.getElementById("btnStart").disabled = "";
+                    document.getElementById("btnStop").disabled = "";
+                };
+                socket.onmessage = function (msg) {
+                    if (typeof msg.data == "string") {
+                        displayContent(msg.data);
+                        if(msg.data=="Receive:100%"){
+                            current=0;
+                            total=0;
+                        }
+                        else if(msg.data.substr(0,7)=="Receive"){
+                            var str1=msg.data.split(':')[1];
+                            var str2=str1.split('/')[0];
+                            picsend(parseInt(str2))
+                        }
+                    }
+                    else {
+                        alert("non text info!!");
+                    }
+                };
+
+                socket.onerror = function (error) { alert("Error："+ error.name); };
+
+                socket.onclose = function (msg) {
+                    document.getElementById("btnConnect").value = "Connect";
+                    document.getElementById("btnConnect").disabled = "";
+                    document.getElementById("btnStart").disabled = true;
+                };
+            }
+            catch (ex) {
+                log(ex);
+            }
+        }
+
+        async function start() {
+            var str = document.getElementById("URL").value;
+            var time_interval = document.getElementById("Interval").value
+            document.getElementById("btnStart").disabled = true;
+            while(1) {
+                socket.send(str);
+                await sleep(parseInt(time_interval))
+            }
+        }
+        async function stop() {
+            //socket.send("stop")
+            socket.close();
+            document.getElementById("btnConnect").value = "Connect";
+            document.getElementById("btnConnect").disabled = "";
+            document.getElementById("btnStart").disabled = true;
+            document.getElementById("btnStop").disabled = true;
+        }
+        async function picsend(pos){
+            beforetime=new Date().getTime();
+            current=pos;
+            socket.close();
+            connect_and_send();
+            while(document.getElementById("btnConnect").value != "connect successfully") {await sleep(200);}
+            var str = document.getElementById("sendText").value;
+            socket.send(str.substring(pos));
+        }
+
+        window.onbeforeunload = function () {
+            try {
+                socket.close();
+                socket = null;
+            }
+            catch (ex) {
+            }
+        };
+
+        function $(id) { return document.getElementById(id); }
+
+        Date.prototype.Format = function (fmt) { //author: meizz
+            var o = {
+                "M+": this.getMonth() + 1, //month
+                "d+": this.getDate(), //date
+                "h+": this.getHours(), //hour
+                "m+": this.getMinutes(), //minute
+                "s+": this.getSeconds(), //second
+                "S": this.getMilliseconds() //millisecond
+            };
+            if (/(y+)/.test(fmt)) fmt = fmt.replace(RegExp.$1, (this.getFullYear() + "").substr(4 - RegExp.$1.length));
+            for (var k in o)
+                if (new RegExp("(" + k + ")").test(fmt)) fmt = fmt.replace(RegExp.$1, (RegExp.$1.length == 1) ? (o[k]) : (("00" + o[k]).substr(("" + o[k]).length)));
+            return fmt;
+        }
+
+        function displayContent(msg) {
+            $("txtContent").value += "\r\n" +new Date().Format("yyyy/MM/dd hh:mm:ss:S")+ ":  " + msg;
+            $("txtContent").scrollTop = $("txtContent").scrollHeight;
+        }
+        function onkey(event) { if (event.keyCode == 13) { send(); } }
+    </script>
+</html>
