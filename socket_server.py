@@ -136,7 +136,6 @@ class returnCrossDomain(Thread):
             'user-agent': user_agent
         }
         req = request.Request(url, headers=header)
-        print("test")
         self.num += 1
         return self.num
 
